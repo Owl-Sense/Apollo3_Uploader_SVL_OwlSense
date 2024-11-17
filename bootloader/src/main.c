@@ -60,7 +60,7 @@ Modified: Juy 22 2019
 // Defines
 //
 //*****************************************************************************
-#define SVL_VERSION_NUMBER 0x06
+#define SVL_VERSION_NUMBER 0x07
 
 // ****************************************
 //
@@ -147,6 +147,73 @@ void *hUART_debug = NULL; // pointer to handle for debug UART
 #define BL_BAUD_SAMPLES (5)
 volatile uint8_t bl_baud_ticks_index = 0x00;
 volatile uint32_t bl_baud_ticks[BL_BAUD_SAMPLES] = {0};
+const unsigned int OwlSenseMagicConst = 0x05c;
+
+typedef struct {
+    unsigned int OwlSenseMagic;
+    unsigned int OwlSenseVersionNumber;
+    unsigned int PageCount;
+} FirmwareConfig;
+
+FirmwareConfig firmwareConfig;
+
+const int WIRELESS_LED = 25;
+const int RECORD_LED = 26;
+const int STANDBY_LED = 27;
+const int ERROR_LED = 28;
+
+
+#define FLAG_PAGE                           0x80000
+#define SECONDARY_IMAGE_ADDRESS             0x82000
+uint32_t flashBuffer[AM_HAL_FLASH_PAGE_SIZE / 4];
+
+
+/*
+    Returns true when a new valid firmware exists at the secondary address.
+    Main application firmware is responsible for all validation!
+*/
+int checkFlagPage()
+{
+     memcpy(&firmwareConfig, (uint32_t*)FLAG_PAGE, sizeof(FirmwareConfig));
+     if(firmwareConfig.OwlSenseMagic ==  OwlSenseMagicConst){
+        return 1;
+     }
+     return 0;
+}
+
+void copyNewFirmware() {
+    //am_hal_gpio_state_write(WIRELESS_LED, AM_HAL_GPIO_OUTPUT_SET);
+    uint32_t sourceAddress = SECONDARY_IMAGE_ADDRESS;
+    uint32_t destAddress = USERCODE_OFFSET;
+    uint32_t bytesRead;
+    uint32_t totalBytes = 0;
+
+    // Read the file in chunks and compare each chunk with flash memory
+    for(int i = 0; i < firmwareConfig.PageCount; ++i) {
+        am_hal_gpio_state_write(RECORD_LED, AM_HAL_GPIO_OUTPUT_SET);
+        am_hal_gpio_state_write(WIRELESS_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
+        am_util_delay_ms(50);
+        am_hal_gpio_state_write(RECORD_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
+        am_hal_gpio_state_write(WIRELESS_LED, AM_HAL_GPIO_OUTPUT_SET);
+        am_util_delay_ms(50);
+        // Read the current page from flash into flashBuffer
+        memcpy(flashBuffer, (uint32_t*)sourceAddress, AM_HAL_FLASH_PAGE_SIZE);
+        int status = am_hal_flash_page_erase(AM_HAL_FLASH_PROGRAM_KEY,AM_HAL_FLASH_ADDR2INST(destAddress), AM_HAL_FLASH_ADDR2PAGE(destAddress));
+        if (status != AM_HAL_STATUS_SUCCESS)
+            am_hal_gpio_state_write(ERROR_LED, AM_HAL_GPIO_OUTPUT_SET);
+
+        status = am_hal_flash_program_main(AM_HAL_FLASH_PROGRAM_KEY, flashBuffer, (uint32_t*)destAddress, AM_HAL_FLASH_PAGE_SIZE / 4); 
+        if (status != AM_HAL_STATUS_SUCCESS)
+            am_hal_gpio_state_write(ERROR_LED, AM_HAL_GPIO_OUTPUT_SET);
+    
+        // Advance to the next page
+        destAddress += AM_HAL_FLASH_PAGE_SIZE;
+        sourceAddress += AM_HAL_FLASH_PAGE_SIZE;
+    }
+
+}
+
+
 
 //*****************************************************************************
 //
@@ -155,6 +222,16 @@ volatile uint32_t bl_baud_ticks[BL_BAUD_SAMPLES] = {0};
 //*****************************************************************************
 int main(void)
 {
+
+    am_hal_gpio_pinconfig(STANDBY_LED, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(RECORD_LED, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(WIRELESS_LED, g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_pinconfig(ERROR_LED, g_AM_HAL_GPIO_OUTPUT);
+
+    am_hal_gpio_state_write(STANDBY_LED, AM_HAL_GPIO_OUTPUT_SET);
+    am_hal_gpio_state_write(RECORD_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
+    am_hal_gpio_state_write(ERROR_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
+    am_hal_gpio_state_write(WIRELESS_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
 
     bool baud_valid = false;
     uint32_t bl_baud = 0x00;
@@ -173,6 +250,11 @@ int main(void)
     baud_valid = detect_baud_rate(&bl_baud); // Detects the baud rate. Returns true if a valid baud rate was found
     if (baud_valid == false)
     {
+        if(checkFlagPage())
+        {
+            copyNewFirmware();
+        }
+        am_hal_gpio_state_write(STANDBY_LED, AM_HAL_GPIO_OUTPUT_CLEAR);
         app_start(); // w/o valid baud rate jump t the app
     }
 

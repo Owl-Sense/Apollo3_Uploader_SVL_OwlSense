@@ -78,7 +78,7 @@
 
 # You can override these values on the command line e.g. make bootload COM_PORT=/dev/cu***
 # COM_PORT is the serial port to use for uploading. For example COM#### on Windows or /dev/cu.usbserial-#### on *nix
-COM_PORT		?=
+COM_PORT		?= COM6
 # ASB_UPLOAD_BAUD is the baud rate setting of the Ambiq Secue Bootloader (ASB) as it is configured on the Apollo3. Defautls to 115200 if unset
 ASB_UPLOAD_BAUD	?=
 # SVL_UPLOAD_BAUD is the baud rate setting of the SparkFun Variable Loader (SVL). Defaults to 921600 if unset
@@ -89,12 +89,13 @@ PYTHON3			?=
 # *Optionally* specify absolute paths to the SDK and the BSP
 # You can do this on the command line - e.g. make bootload SDKPATH=~/$AMBIQ_SDK_ROOT_PATH
 # Make sure to use / instead of \ when on Windows
-SDKPATH			?=# Set as the path to the SDK root if not located at ../../../../..
-COMMONPATH		?=# Set as the path to the BSP common folder if not located at ../../../../common
-BOARDPATH		?=# Set as the path to the board if not located at ../../..
-PROJECTPATH		?=# Set as the path to the project if not located at ..
-BOARD			?=# If using a SparkFun board you can simply provide the name e.g. redboard_artemis_atp
-
+SDKPATH			?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK# Set as the path to the SDK root if not located at ../../../../..
+COMMONPATH		?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK/boards_sfe/common# Set as the path to the BSP common folder if not located at ../../../../common
+BOARDPATH		?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK/boards_sfe/redboard_artemis_atp# Set as the path to the board if not located at ../../..
+PROJECTPATH		?= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/bootloader# Set as the path to the project if not located at ..
+BOARD			:= redboard_artemis_atp# If using a SparkFun board you can simply provide the name e.g. redboard_artemis_atp
+ARTEMIS_SVL 	:= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/dist/windows/svl.exe
+ARTEMIS_ASB 	:= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/dist/windows/asb.exe
 ### Project Settings
 TARGET := svl
 COMPILERNAME := gcc
@@ -106,12 +107,13 @@ PROJECT := $(TARGET)_gcc
 # Warning Messages
 #
 #******************************************************************************
-ifeq ($(BOARD),)
-    $(warning warning: no BOARD specified, will fall back to BOARDPATH for arbitrary bsp locations)
-else
-    BOARDPATH=../../../../$(BOARD)
-    $(warning Using BOARD=$(BOARD) at $(BOARDPATH))
-endif
+$(info Boardpath: $(BOARDPATH))
+#ifeq ($(BOARD),)
+ #   $(warning warning: no BOARD specified, will fall back to BOARDPATH for arbitrary bsp locations)
+#else
+ #   BOARDPATH=../../../../$(BOARD)
+ #   $(warning Using BOARD=$(BOARD) at $(BOARDPATH))
+#endif
 
 ifeq ($(COM_PORT),)
     COM_PORT=COM4
@@ -154,7 +156,7 @@ ifeq ($(notdir $(BOARDPATH)),)
     override BOARDPATH:=$(patsubst %/, %,$(BOARDPATH))
     $(warning BOARDPATH had a trivial 'notdir' so we tried changing it to: $(BOARDPATH))
 endif
-BOARD=$(notdir $(BOARDPATH))
+#BOARD=$(notdir $(BOARDPATH))
 # When the BOARDPATH is given export it
 export BOARDPATH
 endif
@@ -166,7 +168,7 @@ else
 # When the PROJECTPATH is given export it
 export PROJECTPATH
 endif
-
+$(warning board=$(BOARD))
 CONFIG := $(PROJECTPATH)/gcc/$(BOARD)/bin
 $(warning CONFIG=$(CONFIG))
 
@@ -270,17 +272,18 @@ AR = $(TOOLCHAIN)-ar
 SIZE = $(TOOLCHAIN)-size
 RM = $(shell which rm 2>/dev/null)
 
+
 EXECUTABLES = CC LD CP OD AR RD SIZE GCC CXX
-K := $(foreach exec,$(EXECUTABLES),\
+#K := $(foreach exec,$(EXECUTABLES),\
         $(if $(shell which $($(exec)) 2>/dev/null),,\
         $(info $(exec) not found on PATH ($($(exec))).)$(exec)))
-$(if $(strip $(value K)),$(info Required Program(s) $(strip $(value K)) not found))
+#$(if $(strip $(value K)),$(info Required Program(s) $(strip $(value K)) not found))
 
-ifneq ($(strip $(value K)),)
-all clean:
-	$(info Tools $(TOOLCHAIN)-$(COMPILERNAME) not installed.)
-	$(RM) -rf bin
-else
+#ifneq ($(strip $(value K)),)
+#all clean:
+#	$(info Tools $(TOOLCHAIN)-$(COMPILERNAME) not installed.)
+#	$(RM) -rf bin
+#else
 
 
 
@@ -315,6 +318,10 @@ CFLAGS+= $(DEFINES)
 CFLAGS+= $(INCLUDES)
 CFLAGS+= 
 
+CFLAGS += -specs=nosys.specs
+CFLAGS += -nostdlib
+
+
 XSTD   = -std=gnu++11
 
 XFLAGS = $(CFLAGS)
@@ -325,6 +332,8 @@ LFLAGS+= -nostartfiles -static
 LFLAGS+= -Wl,--gc-sections,--entry,Reset_Handler,-Map,$(CONFIG)/$(TARGET).map
 LFLAGS+= -Wl,--start-group -lm -lc -lgcc $(LIBS) -Wl,--end-group
 LFLAGS+= 
+
+LFLAGS += -lc -lnosys
 
 # Additional user specified CFLAGS
 CFLAGS+=$(EXTRA_CFLAGS)
@@ -342,40 +351,34 @@ all: asb
 asb: directories $(CONFIG)/$(TARGET).bin
 
 directories:
-	@mkdir -p $(CONFIG)
+	@if not exist "$(CONFIG)" mkdir "$(CONFIG)"
 
 $(CONFIG)/%.o: %.cpp $(CONFIG)/%.d
-	@echo " Compiling $(COMPILERNAME) $<" ;\
 	$(CXX) -c $(XSTD) $(XFLAGS) $< -o $@
 
 $(CONFIG)/%.o: %.cc $(CONFIG)/%.d
-	@echo " Compiling $(COMPILERNAME) $<" ;\
 	$(CXX) -c $(XSTD) $(XFLAGS) $< -o $@
 
 $(CONFIG)/%.o: %.c $(CONFIG)/%.d
-	@echo " Compiling $(COMPILERNAME) $<" ;\
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(CONFIG)/%.o: %.s $(CONFIG)/%.d
-	@echo " Assembling $(COMPILERNAME) $<" ;\
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(CONFIG)/$(TARGET).axf: LINKER_FILE = $(COMMONPATH)/tools_sfe/templates/asb_linker.ld
 $(CONFIG)/$(TARGET).axf: $(OBJS) $(LIBS)
-	@echo " Linking $(COMPILERNAME) $@ with script $(LINKER_FILE)";\
 	$(CC) -Wl,-T,$(LINKER_FILE) -o $@ $(OBJS) $(LFLAGS)
 
 $(CONFIG)/$(TARGET).bin: $(CONFIG)/$(TARGET).axf
-	@echo " Copying $(COMPILERNAME) $@..." ;\
-	$(CP) $(CPFLAGS) $< $@ ;\
+	$(CP) $(CPFLAGS) $< $@
 	$(OD) $(ODFLAGS) $< > $(CONFIG)/$(TARGET).lst
 
 bootload_asb: directories $(CONFIG)/$(TARGET).bin
-	$(AMBIQ_BIN2BOARD) --bin $(CONFIG)/$(TARGET).bin --load-address-blob 0x20000 --magic-num 0xCB -o $(CONFIG)/$(TARGET) --version 0x0 --load-address-wired 0xC000 -i 6 --options 0x1 -b $(ASB_UPLOAD_BAUD) -port $(COM_PORT) -r 2 -v 
+	$(ARTEMIS_ASB) --bin $(CONFIG)/$(TARGET).bin --load-address-blob 0x20000 --magic-num 0xCB -o $(CONFIG)/$(TARGET) --version 0x0 --load-address-wired 0xC000 -i 6 --options 0x1 -b $(ASB_UPLOAD_BAUD) -port $(COM_PORT) -r 2 -v 
 
-bootload_svl: directories $(CONFIG)/$(TARGET)_svl.bin
-	$(ARTEMIS_SVL) $(COM_PORT) -f $(CONFIG)/$(TARGET)_svl.bin -b $(SVL_UPLOAD_BAUD) -v
-
+bootload_svl: directories $(CONFIG)/$(TARGET).bin
+	$(ARTEMIS_SVL) $(COM_PORT) -f $(CONFIG)/$(TARGET).bin -b $(SVL_UPLOAD_BAUD) -v
+	
 bootload: bootload_svl
 
 clean:
@@ -401,5 +404,5 @@ $(BOARDPATH)/bsp/gcc/bin/libam_bsp.a:
 
 # Automatically include any generated dependencies
 -include $(DEPS)
-endif
+#endif
 .PHONY: all clean directories bootload bootload_asb bootload_svl
