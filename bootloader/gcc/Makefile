@@ -92,10 +92,10 @@ PYTHON3			?=
 SDKPATH			?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK# Set as the path to the SDK root if not located at ../../../../..
 COMMONPATH		?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK/boards_sfe/common# Set as the path to the BSP common folder if not located at ../../../../common
 BOARDPATH		?= C:/Users/Troy/OneDrive/Projects/AmbiqSuiteSDK/boards_sfe/redboard_artemis_atp# Set as the path to the board if not located at ../../..
-PROJECTPATH		?= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/bootloader# Set as the path to the project if not located at ..
+PROJECTPATH		?= C:/Users/Troy/OneDrive/Projects-OwlSense/Apollo3_Uploader_SVL_OwlSense/bootloader# Set as the path to the project if not located at ..
 BOARD			:= redboard_artemis_atp# If using a SparkFun board you can simply provide the name e.g. redboard_artemis_atp
-ARTEMIS_SVL 	:= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/dist/windows/svl.exe
-ARTEMIS_ASB 	:= C:/Users/Troy/OneDrive/Projects/Apollo3_Uploader_SVL/dist/windows/asb.exe
+ARTEMIS_SVL 	:= C:/Users/Troy/OneDrive/Projects-OwlSense/Apollo3_Uploader_SVL_OwlSense/dist/windows/svl.exe
+ARTEMIS_ASB 	:= C:/Users/Troy/OneDrive/Projects-OwlSense/Apollo3_Uploader_SVL_OwlSense/dist/windows/asb.exe
 ### Project Settings
 TARGET := svl
 COMPILERNAME := gcc
